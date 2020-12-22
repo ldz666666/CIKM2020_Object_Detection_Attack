@@ -1,0 +1,112 @@
+import os
+import numpy as np
+
+from tqdm import tqdm
+
+import sys
+sys.path.append('./mmdetection/')
+from mmdet import __version__
+from mmdet.apis import init_detector, inference_detector
+
+
+def infer(config, checkpoint, img_file_dir, output_dir, json_name='bbox_score.json', show_score_thr=0.3):
+
+    model = init_detector(config, checkpoint, device='cuda:0')
+    img_dir = img_file_dir
+    file_name_list = os.listdir(img_dir)
+    img_dir2 = img_dir.replace('_p', '')
+    results = {}
+    ik = 0
+    for i in tqdm(range(len(file_name_list))):
+        file_name = file_name_list[i]
+        if os.path.splitext(file_name)[1] not in ['.jpg', '.png', '.bmp', '.gif']:
+            continue
+        #print('infering')
+        result_p = inference_detector(model, img_dir + file_name)
+        
+        '''print('result_p is ')
+        print(result_p)'''
+        
+        result_c = inference_detector(model, img_dir2 + file_name)
+        
+        '''print('result_c is')
+        print(result_c)'''
+        
+        if isinstance(result_p, tuple):
+            bbox_results, _ = result_p
+            result_p = bbox_results
+            bbox_results, _ = result_c
+            result_c = bbox_results
+            
+        '''print('result_p is ')
+        print(type(result_p))
+        print(len(result_p))
+        print('result_c is ')
+        print(type(result_c))
+        print(result_c)
+        print(len(result_c))'''
+        
+        result_above_confidence_num_p = 0
+        result_above_confidence_num_c = 0
+        #print(result_p)
+        result_p = np.concatenate(result_p)
+        result_c = np.concatenate(result_c)
+        
+        '''print('result_c shape',result_c.shape)'''
+        '''result_show=result_c[result_c[:,4]>show_score_thr]
+        print('bounding boxes result_to_show',result_show)
+        print(result_show.shape)'''
+        
+        for ir in range(len(result_p)):
+            if result_p[ir, 4] > show_score_thr:
+                result_above_confidence_num_p = result_above_confidence_num_p + 1
+        for ir in range(len(result_c)):
+            if result_c[ir, 4] > show_score_thr:
+                result_above_confidence_num_c = result_above_confidence_num_c + 1
+        if result_above_confidence_num_c == 0:  # can't find any object in clean img
+            bb_score = 0
+            print('i=', ik)
+            print(file_name)
+            ik += 1
+        else:
+            bb_score = 1 - min(result_above_confidence_num_c,
+                               result_above_confidence_num_p) / result_above_confidence_num_c
+        results[file_name] = bb_score
+    import json
+    with open(os.path.join(output_dir, json_name), 'w') as f_obj:
+        json.dump(results, f_obj)
+    return results
+
+#change the order of c and p
+def infer_rcnn(img_path0,img_path1,rcnn_model):
+    
+    show_score_thr=0.3
+    
+    result_p = inference_detector(rcnn_model, img_path1)
+    result_c = inference_detector(rcnn_model, img_path0)
+        
+        
+    if isinstance(result_p, tuple):
+        bbox_results, _ = result_p
+        result_p = bbox_results
+        bbox_results, _ = result_c
+        result_c = bbox_results
+        
+    result_above_confidence_num_p = 0
+    result_above_confidence_num_c = 0
+    #print(result_p)
+    result_p = np.concatenate(result_p)
+    result_c = np.concatenate(result_c)
+        
+    for ir in range(len(result_p)):
+        if result_p[ir, 4] > show_score_thr:
+            result_above_confidence_num_p = result_above_confidence_num_p + 1
+    for ir in range(len(result_c)):
+        if result_c[ir, 4] > show_score_thr:
+            result_above_confidence_num_c = result_above_confidence_num_c + 1
+    if result_above_confidence_num_c == 0:  # can't find any object in clean img
+        bb_score = 0
+    else:
+        bb_score = 1 - min(result_above_confidence_num_c,
+                               result_above_confidence_num_p) / result_above_confidence_num_c
+    return bb_score
