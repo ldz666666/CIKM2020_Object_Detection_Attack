@@ -3,5 +3,5 @@
 
 ## Usage 
 This implementation is based on docker and [mmdetection](https://github.com/open-mmlab/mmdetection), to run the code, you need to create a docker image for mmdetection following the tutorial in the website  
-To conduct an attack, just run `python attack_dilation.py` under the /attack_ens folder
+To conduct an attack, just run `python attack_dilation.py` under the ./attack_ens folder
 
